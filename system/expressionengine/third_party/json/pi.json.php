@@ -316,6 +316,53 @@ class Json
   {
     return htmlspecialchars($field_data, ENT_QUOTES);
   }
+
+  protected function entries_content_elements($entry_id, $field, $field_data)
+  {
+
+    $return_data = array();
+
+    // This deals with content element's base64 insanity
+    $the_real_data = unserialize($field_data);
+
+    foreach ($the_real_data as $value) {
+      
+      // Sort out some of the data that content elements gives us
+      $element_settings = unserialize(base64_decode($value['element_settings']));
+
+      $formatted = array('type' => $element_settings['type'], 
+                         'title' => $element_settings['settings']['title'],
+                         'content' => null);
+
+      // But now we need to do something special depending on which type of field we have
+      switch ($formatted['type']) {
+        case 'wygwam':
+          // Wygwam is easy, just set the content to the actual content
+          $formatted['content'] = $value['data'];
+          break;
+
+        case 'heading':
+          // Headings have more serialized stuff, and to boot
+          // Supress warning is not a choice, even Content Elements does it
+          // within its own source code. It's needed.
+          $heading_data = unserialize($value['data'])['heading_data'];
+          $formatted['content'] = array('heading_type' => $heading_data['heading'],
+                                        'content' => $heading_data['content']);
+          break;  
+        
+        default:
+          // Nothing to do here
+          break;
+      }
+      
+      array_push($return_data, $formatted);
+
+    }
+
+    return $return_data;
+
+  }
+
   protected function entries_matrix($entry_id, $field, $field_data)
   {
     if (is_null($this->entries_matrix_rows))
