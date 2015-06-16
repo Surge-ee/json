@@ -546,10 +546,35 @@ class Json
     return array();
   }
 
+  protected function get_data_from_playa($entry_id)
+  {
+
+    // Now we can get the field ids
+    $field_data = ee()->db->select('channel_fields.field_id, channel_fields.field_name')
+        ->from('channel_data')
+        ->join('channels', 'channels.channel_id = channel_data.channel_id', 'LEFT')
+        ->join('channel_fields', 'channel_fields.group_id = channels.field_group', 'LEFT')
+        ->where('channel_data.entry_id', $entry_id)
+        ->get()->result_array();
+
+    $field_ids = array_map(function($item) {
+      return 'field_id_' . $item['field_id'] . ' as ' . $item['field_name'];
+    }, $field_data);
+
+    $data = ee()->db->select($field_ids)
+        ->from('channel_data')
+        ->where('entry_id', $entry_id)
+        ->get()->result();
+
+    return $data;
+
+  }
+
   protected function entries_playa($entry_id, $field, $field_data)
   {
     if (is_null($this->entries_playa_data))
     {
+
       $query = ee()->db->select('parent_entry_id, child_entry_id, parent_field_id')
                        ->where_in('parent_entry_id', $this->entries_entry_ids)
                        ->order_by('rel_order', 'asc')
@@ -575,7 +600,18 @@ class Json
 
     if (isset($this->entries_playa_data[$entry_id][$field['field_id']]))
     {
-      return $this->entries_playa_data[$entry_id][$field['field_id']];
+
+      $retId = $this->entries_playa_data[$entry_id][$field['field_id']];
+
+      $playa_data = array();
+
+      foreach ($retId as $value) {
+        $temp = $this->get_data_from_playa($value);
+        array_push($playa_data, array('entry_data' => $temp, 'entry_id' => $value));
+      }
+
+      return $playa_data;
+
     }
 
     return array();
@@ -583,7 +619,7 @@ class Json
 
   protected function entries_channel_files($entry_id, $field, $field_data, $entry)
   {
-    $this->entries_channel_files_data = array();
+    $this->entries_channel_files_data = [];
 
     $field_settings = unserialize(base64_decode($field['field_settings']));
     $field_settings = $field_settings['channel_files'];
